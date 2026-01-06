@@ -8,51 +8,40 @@
 #   A dataframe containing predictions per model per dataset.
 ##########################################################
 
-# %%
 import os
 from functools import partial
 
 import numpy as np
 import pandas as pd
 from neuralforecast.losses.numpy import smape
-from plotnine import (
-    aes,
-    coord_flip,
-    geom_boxplot,
-    ggplot,
-    ggsave,
-    labs,
-    scale_y_continuous,
-)
+from plotnine import (aes, coord_flip, geom_boxplot, ggplot, ggsave, labs,
+                      scale_y_continuous)
 from statsforecast import StatsForecast
-from statsforecast.models import AutoARIMA, AutoCES, AutoETS, SeasonalNaive
+from statsforecast.models import (AutoARIMA, AutoCES, AutoETS, AutoTheta,
+                                  SeasonalNaive)
 
-# %%
-os.chdir("S:\Python\projects\exploration")
+os.getcwd()
+
+progress_folder_path = os.path.join(os.getcwd(), "data/progress_data")
+if not os.path.exists(progress_folder_path):
+    os.makedirs(progress_folder_path)
 
 
 ##########################
 # Load data
 ##########################
-# %%
-def load_data(dataType):
-    if dataType == "daily":
-        trainFile = os.path.join(os.getcwd(), "data/daily-train.csv")
-        testFile = os.path.join(os.getcwd(), "data/daily-test.csv")
-    elif dataType == "weekly":
-        trainFile = os.path.join(os.getcwd(), "data/weekly-train.csv")
-        testFile = os.path.join(os.getcwd(), "data/weekly-test.csv")
-    elif dataType == "monthly":
-        trainFile = os.path.join(os.getcwd(), "data/monthly-train.csv")
-        testFile = os.path.join(os.getcwd(), "data/monthly-test.csv")
-    elif dataType == "quarterly":
-        trainFile = os.path.join(os.getcwd(), "data/quarterly-train.csv")
-        testFile = os.path.join(os.getcwd(), "data/quarterly-test.csv")
+def load_data(dataset):
+
+    trainFile = os.path.join(os.getcwd(), f"data/{dataset}_train.csv")
+    testFile = os.path.join(os.getcwd(), f"data/{dataset}_test.csv")
 
     train = pd.read_csv(trainFile)
     train["ds"] = pd.to_datetime(train["ds"]).dt.normalize()
+    train = train.sort_values(by=["unique_id", "ds"])
+
     test = pd.read_csv(testFile)
     test["ds"] = pd.to_datetime(test["ds"]).dt.normalize()
+    test = test.sort_values(by=["unique_id", "ds"])
 
     return train, test
 
@@ -60,35 +49,39 @@ def load_data(dataType):
 ##########################
 # Train models
 ##########################
-# %%
 def predict_stats_models(train, test, dataset):
-    if dataset == "daily":
-        sp = 365
+    if dataset == "other":
+        sp = 8
         freq = "D"
-    elif dataset == "weekly":
-        sp = 52
-        freq = "W"
+        h = 8
     elif dataset == "monthly":
         sp = 12
-        freq = "M"
+        freq = "ME"
+        h = 18
     elif dataset == "quarterly":
         sp = 4
-        freq = "Q"
+        freq = "QE"
+        h = 8
+    elif dataset == "yearly":
+        sp = 1
+        freq = "YE"
+        h = 6
 
     models = [
         SeasonalNaive(season_length=sp),
         AutoARIMA(season_length=sp),
         AutoETS(season_length=sp),
         AutoCES(season_length=sp),
+        AutoTheta(season_length=sp),
     ]
     # models = [SeasonalNaive(season_length=sp)]
     sf = StatsForecast(models=models, freq=freq, n_jobs=8)
-    sf.fit(df=train, sort_df=True)
+    sf.fit(df=train)
 
-    predDF = sf.predict(h=10).reset_index()
+    predDF = sf.predict(h=h).reset_index()
 
     predDF = test.merge(right=predDF, on=["unique_id", "ds"], how="inner").drop(
-        ["ID"], axis=1
+        ["index"], axis=1
     )
 
     predDF["data"] = dataset
@@ -117,25 +110,22 @@ def wrapper(dataset):
 ##########################
 # train models
 ##########################
-
-# %%
-datasets = ["monthly", "quarterly"]  # Daily OOM
+datasets = ["other", "monthly", "quarterly", "yearly"]
 modelPredictions = list(map(wrapper, datasets))
 modelPredictions = pd.concat(modelPredictions)
 
 
-# %%
 def check_rows(dataset, modelPredictions):
     modelPredictions = modelPredictions.loc[modelPredictions.data == dataset]
     _, test = load_data(dataset)
-    B = test.shape[0] * 3 == modelPredictions.shape[0]
+    B = test.shape[0] * 5 == modelPredictions.shape[0]
     return B
 
 
 temp = partial(check_rows, modelPredictions=modelPredictions)
 all(list(map(temp, datasets)))
 
-# %%
+
 fn = os.path.join("data", "predictionsStatsDF.csv")
 fn = os.path.join(os.getcwd(), fn)
 modelPredictions.to_csv(
@@ -143,7 +133,7 @@ modelPredictions.to_csv(
     index=False,
 )
 
-# %%
+
 fn = os.path.join("data", "predictionsStatsDF.csv")
 fn = os.path.join(os.getcwd(), fn)
 modelPredictions = pd.read_csv(fn)
@@ -152,7 +142,6 @@ modelPredictions = pd.read_csv(fn)
 ################################################
 # Summarize
 ################################################
-# %%
 def calc_smape(df, Y="y", YHAT="y_hat"):
     out = smape(df[Y], df[YHAT])
     return out
@@ -160,11 +149,10 @@ def calc_smape(df, Y="y", YHAT="y_hat"):
 
 metricDF = modelPredictions.groupby(
     ["data", "model", "unique_id"], as_index=False
-).apply(calc_smape)
+).apply(calc_smape, include_groups=False)
 metricDF.columns.values[3] = "smape"
 metricDF = metricDF.sort_values(by=["data", "model", "unique_id"])
 
-# %%
 graph = (
     ggplot(metricDF, aes(x="data", y="smape", fill="model"))
     + geom_boxplot(alpha=0.40)
@@ -178,10 +166,8 @@ graph = (
 )
 ggsave(
     graph,
-    os.path.join(os.getcwd(), "graphs\stats_models.png"),
+    os.path.join(os.getcwd(), "graphs/stats_models.png"),
     width=10,
     height=10,
 )
 graph
-
-# %%
