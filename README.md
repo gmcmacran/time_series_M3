@@ -4,13 +4,16 @@
 
 This repo takes the
 [M3](https://www.sciencedirect.com/science/article/abs/pii/S0169207000000571)
-competition’s data and builds 5 different models:
+competition’s data and builds 7 different models:
 
 - Seasonal Naive
 - Auroregressive Integrated Moving Average (ARIMA)
 - Error Trend Seasonality (ETS)
 - Complex Exponential Smoothing (CES)
 - Theta
+- Median, Frourier Functions, Linear Trend, Exponential Smoothing
+  (MFLES)
+- Trigonomic Box-Cox, ARMA, Trend and Seasonal Components (TBATS)
 
 ### Data Exploration
 
@@ -38,7 +41,7 @@ width="336" height="240" />
 
 ### Comparison with Other Participants
 
-The seasonal naive model did surprisingly well. However, all 4
+The seasonal naive model did surprisingly well. However, all 6
 statistical models were able to beat it. Error Trend Seasonality is the
 best model.
 

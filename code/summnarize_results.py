@@ -32,7 +32,7 @@ def calc_smape(df, Y="y", YHAT="y_hat"):
 ################################################
 modelPredictions = load_predictions("predictionsStatsDF.csv")
 
-modelPredictions.model.nunique() == 5
+modelPredictions.model.nunique() == 7
 modelPredictions.dropna().shape[0] == modelPredictions.shape[0]
 np.all(np.isfinite(modelPredictions.y_hat))
 
