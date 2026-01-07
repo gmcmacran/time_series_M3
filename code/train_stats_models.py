@@ -14,11 +14,25 @@ from functools import partial
 import numpy as np
 import pandas as pd
 from neuralforecast.losses.numpy import smape
-from plotnine import (aes, coord_flip, geom_boxplot, ggplot, ggsave, labs,
-                      scale_y_continuous)
+from plotnine import (
+    aes,
+    coord_flip,
+    geom_boxplot,
+    ggplot,
+    ggsave,
+    labs,
+    scale_y_continuous,
+)
 from statsforecast import StatsForecast
-from statsforecast.models import (AutoARIMA, AutoCES, AutoETS, AutoTheta,
-                                  SeasonalNaive)
+from statsforecast.models import (
+    AutoARIMA,
+    AutoCES,
+    AutoETS,
+    AutoMFLES,
+    AutoTBATS,
+    AutoTheta,
+    SeasonalNaive,
+)
 
 os.getcwd()
 
@@ -73,6 +87,8 @@ def predict_stats_models(train, test, dataset):
         AutoETS(season_length=sp),
         AutoCES(season_length=sp),
         AutoTheta(season_length=sp),
+        AutoMFLES(test_size=h, season_length=sp),
+        AutoTBATS(season_length=sp),
     ]
     # models = [SeasonalNaive(season_length=sp)]
     sf = StatsForecast(models=models, freq=freq, n_jobs=8)
@@ -118,7 +134,7 @@ modelPredictions = pd.concat(modelPredictions)
 def check_rows(dataset, modelPredictions):
     modelPredictions = modelPredictions.loc[modelPredictions.data == dataset]
     _, test = load_data(dataset)
-    B = test.shape[0] * 5 == modelPredictions.shape[0]
+    B = test.shape[0] * 7 == modelPredictions.shape[0]
     return B
 
 
